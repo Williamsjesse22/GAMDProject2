@@ -23,6 +23,10 @@ namespace TicTacToe
         [SerializeField] private Player _humanPlayer = Player.X;
         [Tooltip("Cosmetic delay before the AI commits its move so the player can see their own move first.")]
         [SerializeField] private float _aiThinkPauseSeconds = 0.35f;
+        [Tooltip("Disable to silence all procedural audio cues.")]
+        [SerializeField] private bool _enableAudio = true;
+        [Range(0f, 1f)]
+        [SerializeField] private float _audioVolume = 0.7f;
 
         private enum GameState { Menu, Playing, Over }
 
@@ -41,6 +45,13 @@ namespace TicTacToe
         private GUIStyle _menuTitleStyle;
         private GUIStyle _buttonStyle;
 
+        private AudioSource _audio;
+        private AudioClip _humanPlaceClip;
+        private AudioClip _aiPlaceClip;
+        private AudioClip _winClip;
+        private AudioClip _loseClip;
+        private AudioClip _drawClip;
+
         private static readonly DifficultyLevel[] s_difficultyOrder =
         {
             DifficultyLevel.Easy,
@@ -58,6 +69,30 @@ namespace TicTacToe
             _aiPlayer = _humanPlayer.Opponent();
             _board = new Board3D();
             _currentPlayer = Player.X;
+            SetupAudio();
+        }
+
+        private void SetupAudio()
+        {
+            _audio = GetComponent<AudioSource>();
+            if (_audio == null) _audio = gameObject.AddComponent<AudioSource>();
+            _audio.playOnAwake = false;
+            _audio.spatialBlend = 0f; // 2D — same volume regardless of camera distance.
+            _audio.volume = _audioVolume;
+
+            // Distinct pitches so the player can hear who just moved.
+            _humanPlaceClip = SoundSynth.Beep("ttt_place_human", 880f, 0.08f);
+            _aiPlaceClip = SoundSynth.Beep("ttt_place_ai", 660f, 0.10f);
+            // C major arpeggio for win, descending minor-ish for loss.
+            _winClip = SoundSynth.Arp("ttt_win", new[] { 523f, 659f, 784f, 1047f }, 0.55f);
+            _loseClip = SoundSynth.Arp("ttt_lose", new[] { 392f, 311f, 247f }, 0.5f);
+            _drawClip = SoundSynth.Beep("ttt_draw", 440f, 0.25f);
+        }
+
+        private void PlayCue(AudioClip clip)
+        {
+            if (!_enableAudio || clip == null || _audio == null) return;
+            _audio.PlayOneShot(clip, _audioVolume);
         }
 
         private void Start()
@@ -144,24 +179,29 @@ namespace TicTacToe
         {
             if (!_board.IsLegal(x, y, z)) return false;
 
-            var move = new Move(x, y, z, _currentPlayer);
+            Player mover = _currentPlayer;
+            var move = new Move(x, y, z, mover);
             _board.Apply(move);
-            _visualizer.PlacePiece(x, y, z, _currentPlayer);
+            _visualizer.PlacePiece(x, y, z, mover);
+            _visualizer.SetLastMove(x, y, z);
+            PlayCue(mover == _humanPlayer ? _humanPlaceClip : _aiPlaceClip);
 
             Player winner = _board.CheckWinner();
             if (winner != Player.None)
             {
                 int[] line = FindWinningLine(winner);
                 if (line != null) _visualizer.HighlightLine(line);
-                EndGame(winner == _humanPlayer ? "You win!"
+                bool humanWon = winner == _humanPlayer;
+                EndGame(humanWon ? "You win!"
                        : winner == _aiPlayer ? "AI wins."
-                       : $"{winner} wins!");
+                       : $"{winner} wins!",
+                       humanWon ? _winClip : _loseClip);
                 return true;
             }
 
             if (_board.IsFull)
             {
-                EndGame("Draw.");
+                EndGame("Draw.", _drawClip);
                 return true;
             }
 
@@ -170,12 +210,13 @@ namespace TicTacToe
             return true;
         }
 
-        private void EndGame(string banner)
+        private void EndGame(string banner, AudioClip endCue)
         {
             _state = GameState.Over;
             _aiThinking = false;
             _resultBanner = banner;
             _statusMessage = $"{banner}    Press R for menu.";
+            PlayCue(endCue);
         }
 
         private void UpdatePlayingStatus()

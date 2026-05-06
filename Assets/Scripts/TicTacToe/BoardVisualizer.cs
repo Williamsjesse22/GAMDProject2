@@ -25,8 +25,17 @@ namespace TicTacToe
         [SerializeField] private Color _oColor = new Color(0.25f, 0.45f, 0.85f);
         [SerializeField] private Color _winningHighlightColor = new Color(1f, 0.85f, 0.2f);
 
+        [Header("Last-move highlight")]
+        [Tooltip("Multiplier applied to the most recently placed piece's scale.")]
+        [SerializeField] private float _lastMoveScaleMultiplier = 1.25f;
+        [Tooltip("How far the most recently placed piece's color is shifted toward white.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _lastMoveTintAmount = 0.4f;
+
         private readonly GameObject[] _cells = new GameObject[Board3D.CellCount];
         private readonly GameObject[] _pieces = new GameObject[Board3D.CellCount];
+        private readonly Player[] _piecePlayers = new Player[Board3D.CellCount];
+        private int _lastMoveIdx = -1;
         private bool _built;
 
         /// <summary>
@@ -63,6 +72,25 @@ namespace TicTacToe
             piece.name = $"Piece_{player}_{x}_{y}_{z}";
             ApplyColor(piece, player == Player.X ? _xColor : _oColor);
             _pieces[idx] = piece;
+            _piecePlayers[idx] = player;
+        }
+
+        /// <summary>
+        /// Mark the move at (x, y, z) as the most recent. The previously highlighted
+        /// piece (if any) is restored to its normal styling. Useful so the player can
+        /// see at a glance where the AI just placed.
+        /// </summary>
+        public void SetLastMove(int x, int y, int z)
+        {
+            int newIdx = Board3D.Index(x, y, z);
+            if (newIdx == _lastMoveIdx) return;
+
+            if (_lastMoveIdx >= 0 && _pieces[_lastMoveIdx] != null)
+                ApplyNormalStyle(_pieces[_lastMoveIdx], _piecePlayers[_lastMoveIdx]);
+
+            _lastMoveIdx = newIdx;
+            if (_pieces[newIdx] != null)
+                ApplyHighlightStyle(_pieces[newIdx], _piecePlayers[newIdx]);
         }
 
         /// <summary>Remove every placed piece. Cells are kept.</summary>
@@ -75,10 +103,12 @@ namespace TicTacToe
                     Destroy(_pieces[i]);
                     _pieces[i] = null;
                 }
+                _piecePlayers[i] = Player.None;
             }
+            _lastMoveIdx = -1;
         }
 
-        /// <summary>Briefly recolor the four pieces along a winning line so the win is visible.</summary>
+        /// <summary>Recolor the four pieces along a winning line so the win is visible.</summary>
         public void HighlightLine(int[] line)
         {
             if (line == null) return;
@@ -87,6 +117,19 @@ namespace TicTacToe
                 GameObject piece = _pieces[line[i]];
                 if (piece != null) ApplyColor(piece, _winningHighlightColor);
             }
+        }
+
+        private void ApplyNormalStyle(GameObject piece, Player player)
+        {
+            piece.transform.localScale = Vector3.one * _pieceScale;
+            ApplyColor(piece, player == Player.X ? _xColor : _oColor);
+        }
+
+        private void ApplyHighlightStyle(GameObject piece, Player player)
+        {
+            piece.transform.localScale = Vector3.one * (_pieceScale * _lastMoveScaleMultiplier);
+            Color baseColor = player == Player.X ? _xColor : _oColor;
+            ApplyColor(piece, Color.Lerp(baseColor, Color.white, _lastMoveTintAmount));
         }
 
         private void SpawnCell(int x, int y, int z)
