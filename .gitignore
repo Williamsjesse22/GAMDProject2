@@ -34,6 +34,9 @@
 # Jetbrains Rider personal-layer settings
 *.DotSettings.user
 
+# Claude Code local settings (user-specific permission allowlist, etc.)
+.claude/
+
 # Visual Studio cache directory
 .vs/
 
