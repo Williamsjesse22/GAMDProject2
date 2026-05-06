@@ -37,6 +37,10 @@
 # Claude Code local settings (user-specific permission allowlist, etc.)
 .claude/
 
+# MCP debug screenshots — test artifacts, not part of the project
+/[Aa]ssets/[Ss]creenshots/
+/[Aa]ssets/[Ss]creenshots.meta
+
 # Visual Studio cache directory
 .vs/
 
