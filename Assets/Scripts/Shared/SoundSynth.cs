@@ -1,11 +1,12 @@
 using UnityEngine;
 
-namespace TicTacToe
+namespace Shared
 {
     /// <summary>
     /// Tiny utility to synthesize <see cref="AudioClip"/>s at runtime so the project
     /// doesn't need shipped audio assets. Sine-wave envelope-shaped tones are good
-    /// enough for click / win / loss cues.
+    /// enough for click / win / loss / detection / heartbeat cues across both
+    /// Phase 1 and Phase 2.
     /// </summary>
     public static class SoundSynth
     {

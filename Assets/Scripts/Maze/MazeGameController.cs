@@ -39,6 +39,9 @@ namespace Maze
         private GUIStyle _hintStyle;
         private Texture2D _whitePixel;
 
+        private AudioSource _audio;
+        private AudioClip _escapeFanfare;
+
         private void Awake()
         {
             Instance = this;
@@ -50,6 +53,13 @@ namespace Maze
             if (_btAgent == null) _btAgent = FindAnyObjectByType<BehaviorTreeAgent>();
             if (_exitLock == null) _exitLock = FindAnyObjectByType<ExitLock>();
             if (_portal == null) _portal = FindAnyObjectByType<Portal>();
+
+            _audio = GetComponent<AudioSource>();
+            if (_audio == null) _audio = gameObject.AddComponent<AudioSource>();
+            _audio.playOnAwake = false;
+            _audio.spatialBlend = 0f;
+            // Triumphant ascending arpeggio: C–E–G–C major spread over 0.7s.
+            _escapeFanfare = SoundSynth.Arp("maze_escape", new[] { 523f, 659f, 784f, 1047f }, 0.7f, 0.55f);
         }
 
         private void OnEnable()
@@ -98,6 +108,9 @@ namespace Maze
             // Disable agents so they can't keep damaging on the win screen.
             if (_fsmAgent != null) _fsmAgent.enabled = false;
             if (_btAgent != null) _btAgent.enabled = false;
+            // Hush the portal hum and play the win fanfare in its place.
+            if (_portal != null) _portal.Deactivate();
+            if (_audio != null && _escapeFanfare != null) _audio.PlayOneShot(_escapeFanfare);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }

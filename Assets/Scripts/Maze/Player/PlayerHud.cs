@@ -22,31 +22,60 @@ namespace Maze.Player
         [Header("Detected indicator")]
         [SerializeField] private float _alertPulseSpeed = 6f;
 
+        [Header("Damage feedback")]
+        [SerializeField] private float _damageFlashSeconds = 0.25f;
+        [SerializeField] private Color _damageFlashColor = new Color(1f, 0.1f, 0.1f, 0.45f);
+        [Tooltip("HP fraction below which the low-HP red vignette starts pulsing.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float _lowHpThreshold = 0.3f;
+        [SerializeField] private float _lowHpVignettePulseSpeed = 1.6f;
+
         private Texture2D _whitePixel;
+        private Texture2D _vignetteEdge;
         private GUIStyle _hpLabelStyle;
         private GUIStyle _alertStyle;
         private GUIStyle _deathStyle;
         private GUIStyle _hintStyle;
+
+        private float _damageFlashTimer;
+        private int _prevHp;
 
         private void Awake()
         {
             if (_health == null) _health = GetComponent<HealthComponent>();
             if (_awareness == null) _awareness = GetComponent<PlayerAwareness>();
             if (_fpc == null) _fpc = GetComponent<FirstPersonController>();
+            if (_health != null) _prevHp = _health.CurrentHp;
         }
 
         private void OnEnable()
         {
-            if (_health != null) _health.OnDied += HandleDied;
+            if (_health != null)
+            {
+                _health.OnDied += HandleDied;
+                _health.OnHealthChanged += HandleHpChanged;
+            }
         }
 
         private void OnDisable()
         {
-            if (_health != null) _health.OnDied -= HandleDied;
+            if (_health != null)
+            {
+                _health.OnDied -= HandleDied;
+                _health.OnHealthChanged -= HandleHpChanged;
+            }
+        }
+
+        private void HandleHpChanged(int current, int max)
+        {
+            if (current < _prevHp) _damageFlashTimer = _damageFlashSeconds;
+            _prevHp = current;
         }
 
         private void Update()
         {
+            if (_damageFlashTimer > 0f) _damageFlashTimer -= Time.deltaTime;
+
             if (_health != null && _health.IsDead)
             {
                 Keyboard kb = Keyboard.current;
@@ -70,6 +99,14 @@ namespace Maze.Player
         private void OnGUI()
         {
             EnsureStyles();
+
+            // Background feedback layers go first so HP/labels/etc. draw on top.
+            if (_health != null && !_health.IsDead)
+            {
+                if (_health.HpFraction < _lowHpThreshold) DrawLowHpVignette();
+                if (_damageFlashTimer > 0f) DrawDamageFlash();
+            }
+
             if (_health != null)
             {
                 DrawHpBar();
@@ -77,6 +114,38 @@ namespace Maze.Player
             }
             if (_awareness != null && _awareness.IsBeingObserved && _health != null && !_health.IsDead)
                 DrawDetectedIndicator();
+        }
+
+        private void DrawDamageFlash()
+        {
+            float t = Mathf.Clamp01(_damageFlashTimer / _damageFlashSeconds);
+            Color c = _damageFlashColor;
+            c.a *= t; // fade out over the timer
+            Color prev = GUI.color;
+            GUI.color = c;
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), _whitePixel);
+            GUI.color = prev;
+        }
+
+        private void DrawLowHpVignette()
+        {
+            // Pulse intensity using HpFraction → smaller fraction = stronger pulse.
+            float severity = 1f - Mathf.Clamp01(_health.HpFraction / _lowHpThreshold);
+            float pulse = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * _lowHpVignettePulseSpeed);
+            float alpha = 0.18f + 0.32f * severity * pulse;
+
+            // Four edge bands tinted red — cheap "vignette" without a custom shader.
+            Color c = new Color(1f, 0.05f, 0.05f, alpha);
+            Color prev = GUI.color;
+            GUI.color = c;
+            float w = Screen.width;
+            float h = Screen.height;
+            float band = Mathf.Max(40f, h * 0.12f);
+            GUI.DrawTexture(new Rect(0, 0, w, band), _whitePixel);          // top
+            GUI.DrawTexture(new Rect(0, h - band, w, band), _whitePixel);   // bottom
+            GUI.DrawTexture(new Rect(0, band, band, h - band * 2f), _whitePixel);          // left
+            GUI.DrawTexture(new Rect(w - band, band, band, h - band * 2f), _whitePixel);   // right
+            GUI.color = prev;
         }
 
         private void EnsureStyles()
