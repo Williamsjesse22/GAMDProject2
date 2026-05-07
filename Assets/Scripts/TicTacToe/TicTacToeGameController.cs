@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Minimax;
 using Shared;
 using UnityEngine;
@@ -40,6 +41,9 @@ namespace TicTacToe
         private DifficultyLevel _difficulty = DifficultyLevel.Medium;
         private PlayState _state = PlayState.Menu;
         private bool _aiThinking;
+
+        // Bonus: move history stack for undo, in placement order.
+        private readonly Stack<Move> _moveHistory = new Stack<Move>();
 
         private string _statusMessage = string.Empty;
         private string _resultBanner;
@@ -128,6 +132,16 @@ namespace TicTacToe
                 return;
             }
 
+            // Standalone-only: U undoes the last human+AI move pair.
+            if (!GameState.IsLockMode
+                && _state == PlayState.Playing
+                && Keyboard.current != null
+                && Keyboard.current.uKey.wasPressedThisFrame)
+            {
+                UndoLastMovePair();
+                return;
+            }
+
             switch (_state)
             {
                 case PlayState.Menu:
@@ -137,10 +151,65 @@ namespace TicTacToe
                     return;
                 case PlayState.Playing:
                     if (_aiThinking) return;
-                    if (_currentPlayer != _humanPlayer) return;
+                    if (_currentPlayer != _humanPlayer)
+                    {
+                        // Not human's turn — make sure no stale ghost preview lingers.
+                        _visualizer.HideGhost();
+                        return;
+                    }
+                    UpdateHoverPreview();
                     HandleHumanClick();
                     return;
             }
+        }
+
+        private void UpdateHoverPreview()
+        {
+            Mouse mouse = Mouse.current;
+            if (mouse == null || _camera == null) { _visualizer.HideGhost(); return; }
+
+            Vector2 screenPos = mouse.position.ReadValue();
+            Ray ray = _camera.ScreenPointToRay(screenPos);
+            if (!Physics.Raycast(ray, out RaycastHit hit))
+            {
+                _visualizer.HideGhost();
+                return;
+            }
+
+            var interactor = hit.collider.GetComponent<CellInteractor>();
+            if (interactor == null || !_board.IsLegal(interactor.X, interactor.Y, interactor.Z))
+            {
+                _visualizer.HideGhost();
+                return;
+            }
+
+            _visualizer.SetGhostMove(interactor.X, interactor.Y, interactor.Z, _humanPlayer);
+        }
+
+        private void UndoLastMovePair()
+        {
+            if (_moveHistory.Count == 0) return;
+
+            // Cancel any in-flight AI move and stop coroutines so a delayed
+            // AI play doesn't land mid-undo.
+            StopAllCoroutines();
+            _aiThinking = false;
+
+            // Pop up to 2 moves so we revert to the state before the human's
+            // last move (one human + one AI response). If only one is on the
+            // stack, just revert that.
+            int popsNeeded = Mathf.Min(2, _moveHistory.Count);
+            for (int i = 0; i < popsNeeded; i++)
+            {
+                Move m = _moveHistory.Pop();
+                _board.Undo(m);
+                _visualizer.RemovePiece(m.X, m.Y, m.Z);
+            }
+
+            // After undo it should be the human's turn again.
+            _currentPlayer = _humanPlayer;
+            _visualizer.HideGhost();
+            UpdatePlayingStatus();
         }
 
         private void HandleMenuKeyboard()
@@ -200,8 +269,12 @@ namespace TicTacToe
             Player mover = _currentPlayer;
             var move = new Move(x, y, z, mover);
             _board.Apply(move);
+            _moveHistory.Push(move);
             _visualizer.PlacePiece(x, y, z, mover);
             _visualizer.SetLastMove(x, y, z);
+            // Hide the ghost the moment we commit so it doesn't briefly overlap
+            // a real piece on the just-clicked cell.
+            _visualizer.HideGhost();
             PlayCue(mover == _humanPlayer ? _humanPlaceClip : _aiPlaceClip);
 
             Player winner = _board.CheckWinner();
@@ -261,7 +334,10 @@ namespace TicTacToe
             string who = _currentPlayer == _humanPlayer
                 ? $"Your move ({_humanPlayer})"
                 : "AI's move";
-            _statusMessage = $"{who}    [{_difficulty}, depth {_difficulty.ToDepth()}]    R = menu";
+            string controls = GameState.IsLockMode
+                ? string.Empty
+                : "    R = menu    U = undo";
+            _statusMessage = $"{who}    [{_difficulty}, depth {_difficulty.ToDepth()}]{controls}";
         }
 
         private void StartGame(DifficultyLevel difficulty)
@@ -269,6 +345,7 @@ namespace TicTacToe
             StopAllCoroutines();
             _difficulty = difficulty;
             _board.Reset();
+            _moveHistory.Clear();
             _visualizer.ClearPieces();
             _aiPlayer = _humanPlayer.Opponent();
             _currentPlayer = Player.X;
@@ -288,6 +365,7 @@ namespace TicTacToe
         {
             StopAllCoroutines();
             _board.Reset();
+            _moveHistory.Clear();
             _visualizer.ClearPieces();
             _state = PlayState.Menu;
             _aiThinking = false;

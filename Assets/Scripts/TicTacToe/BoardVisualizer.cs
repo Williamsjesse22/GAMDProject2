@@ -39,6 +39,10 @@ namespace TicTacToe
         private int _lastMoveIdx = -1;
         private bool _built;
 
+        // Hover-preview ghost piece — at most one, repositioned each frame.
+        private GameObject _ghostPiece;
+        private Player _ghostPlayer = Player.None;
+
         /// <summary>
         /// Spawn all 64 cell cubes as children of this transform. Idempotent —
         /// subsequent calls are no-ops.
@@ -94,7 +98,56 @@ namespace TicTacToe
                 ApplyHighlightStyle(_pieces[newIdx], _piecePlayers[newIdx]);
         }
 
-        /// <summary>Remove every placed piece. Cells are kept.</summary>
+        /// <summary>
+        /// Remove the piece at <paramref name="x"/>, <paramref name="y"/>,
+        /// <paramref name="z"/> if any. Used by the controller's undo path.
+        /// </summary>
+        public void RemovePiece(int x, int y, int z)
+        {
+            int idx = Board3D.Index(x, y, z);
+            if (_pieces[idx] != null)
+            {
+                Destroy(_pieces[idx]);
+                _pieces[idx] = null;
+            }
+            _piecePlayers[idx] = Player.None;
+            if (_lastMoveIdx == idx) _lastMoveIdx = -1;
+        }
+
+        /// <summary>
+        /// Show a small "ghost" preview piece at the given cell so the player
+        /// can see where their click would land. Replaces any previous ghost.
+        /// </summary>
+        public void SetGhostMove(int x, int y, int z, Player player)
+        {
+            if (player == Player.None)
+            {
+                HideGhost();
+                return;
+            }
+            if (_ghostPiece == null)
+            {
+                _ghostPiece = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(_ghostPiece.GetComponent<Collider>());
+                _ghostPiece.transform.SetParent(transform, worldPositionStays: false);
+                _ghostPiece.name = "GhostPiece";
+            }
+            _ghostPiece.transform.localPosition = LocalCellPos(x, y, z);
+            // Smaller than a real piece + faded color so it's clearly a hint, not a placement.
+            _ghostPiece.transform.localScale = Vector3.one * (_pieceScale * 0.55f);
+            Color baseColor = player == Player.X ? _xColor : _oColor;
+            ApplyColor(_ghostPiece, Color.Lerp(baseColor, new Color(0.85f, 0.85f, 0.85f), 0.5f));
+            _ghostPlayer = player;
+        }
+
+        public void HideGhost()
+        {
+            if (_ghostPiece != null) Destroy(_ghostPiece);
+            _ghostPiece = null;
+            _ghostPlayer = Player.None;
+        }
+
+        /// <summary>Remove every placed piece. Cells are kept. Also clears the hover ghost.</summary>
         public void ClearPieces()
         {
             for (int i = 0; i < _pieces.Length; i++)
@@ -107,6 +160,7 @@ namespace TicTacToe
                 _piecePlayers[i] = Player.None;
             }
             _lastMoveIdx = -1;
+            HideGhost();
         }
 
         /// <summary>
