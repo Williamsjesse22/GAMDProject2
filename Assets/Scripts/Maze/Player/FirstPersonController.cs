@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -31,10 +32,43 @@ namespace Maze.Player
         private float _pitch;
         private bool _cursorLocked;
 
+        private float _baseMoveSpeed;
+        private Coroutine _speedBoostCoroutine;
+        private float _speedBoostExpiresAt = -1f;
+
+        /// <summary>True while a speed-boost pickup is currently active.</summary>
+        public bool HasActiveSpeedBoost => _speedBoostExpiresAt > Time.time;
+
+        /// <summary>Seconds remaining on the current speed boost; 0 when none.</summary>
+        public float SpeedBoostSecondsRemaining =>
+            HasActiveSpeedBoost ? Mathf.Max(0f, _speedBoostExpiresAt - Time.time) : 0f;
+
         private void Awake()
         {
             _cc = GetComponent<CharacterController>();
             if (_camera == null) _camera = GetComponentInChildren<Camera>();
+            _baseMoveSpeed = _moveSpeed;
+        }
+
+        /// <summary>
+        /// Apply a temporary speed multiplier for <paramref name="duration"/> seconds.
+        /// Replaces any existing boost rather than stacking, so picking up two boosts
+        /// in quick succession refreshes the timer instead of compounding.
+        /// </summary>
+        public void ApplySpeedBoost(float multiplier, float duration)
+        {
+            if (_speedBoostCoroutine != null) StopCoroutine(_speedBoostCoroutine);
+            _speedBoostCoroutine = StartCoroutine(SpeedBoostCoroutine(multiplier, duration));
+        }
+
+        private IEnumerator SpeedBoostCoroutine(float multiplier, float duration)
+        {
+            _moveSpeed = _baseMoveSpeed * multiplier;
+            _speedBoostExpiresAt = Time.time + duration;
+            yield return new WaitForSeconds(duration);
+            _moveSpeed = _baseMoveSpeed;
+            _speedBoostExpiresAt = -1f;
+            _speedBoostCoroutine = null;
         }
 
         private void Start()

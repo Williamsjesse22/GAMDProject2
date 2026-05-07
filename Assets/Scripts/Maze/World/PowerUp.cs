@@ -16,12 +16,19 @@ namespace Maze.World
     {
         public enum PowerUpType
         {
-            Health
+            Health,
+            Speed
         }
 
         [SerializeField] private PowerUpType _type = PowerUpType.Health;
-        [Tooltip("Amount applied by this pickup (HP for Health type).")]
+        [Tooltip("Amount applied by this pickup (HP for Health type, ignored for Speed).")]
         [SerializeField] private int _amount = 30;
+
+        [Header("Speed type")]
+        [Tooltip("Speed multiplier applied while the boost is active.")]
+        [SerializeField] private float _speedMultiplier = 1.8f;
+        [Tooltip("Seconds the speed boost stays active after pickup.")]
+        [SerializeField] private float _speedDuration = 6f;
 
         [Header("Idle motion")]
         [SerializeField] private float _rotationSpeed = 60f;
@@ -97,6 +104,8 @@ namespace Maze.World
                 case PowerUpType.Health:
                     // Skip if already full — don't waste the pickup.
                     return hp.CurrentHp < hp.MaxHp;
+                case PowerUpType.Speed:
+                    return true;
                 default:
                     return true;
             }
@@ -108,6 +117,10 @@ namespace Maze.World
             {
                 case PowerUpType.Health:
                     hp.Heal(_amount);
+                    break;
+                case PowerUpType.Speed:
+                    var fpc = hp.GetComponent<FirstPersonController>();
+                    if (fpc != null) fpc.ApplySpeedBoost(_speedMultiplier, _speedDuration);
                     break;
             }
         }
