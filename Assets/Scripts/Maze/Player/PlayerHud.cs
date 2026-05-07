@@ -1,3 +1,4 @@
+using Shared;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -36,6 +37,7 @@ namespace Maze.Player
         private GUIStyle _alertStyle;
         private GUIStyle _deathStyle;
         private GUIStyle _hintStyle;
+        private GUIStyle _levelLabelStyle;
 
         private float _damageFlashTimer;
         private int _prevHp;
@@ -114,6 +116,26 @@ namespace Maze.Player
             }
             if (_awareness != null && _awareness.IsBeingObserved && _health != null && !_health.IsDead)
                 DrawDetectedIndicator();
+
+            DrawLevelLabel();
+        }
+
+        private void DrawLevelLabel()
+        {
+            if (_levelLabelStyle == null)
+                _levelLabelStyle = new GUIStyle(GUI.skin.label) {
+                    fontSize = 18, fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal = { textColor = new Color(0.95f, 0.85f, 0.4f) }
+                };
+            string label = $"Level {GameState.MazeLevel} / {GameState.MaxMazeLevels}";
+            var rect = new Rect((Screen.width - 200f) * 0.5f, 12f, 200f, 28f);
+            // Drop shadow for readability.
+            Color prev = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.65f);
+            GUI.Label(new Rect(rect.x + 2, rect.y + 2, rect.width, rect.height), label, _levelLabelStyle);
+            GUI.color = prev;
+            GUI.Label(rect, label, _levelLabelStyle);
         }
 
         private void DrawDamageFlash()

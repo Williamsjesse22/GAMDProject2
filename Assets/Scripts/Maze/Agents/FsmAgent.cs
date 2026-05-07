@@ -1,4 +1,5 @@
 using Maze.World;
+using Shared;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -57,6 +58,17 @@ namespace Maze.Agents
         {
             base.Awake();
             _patrolTarget = transform.position;
+
+            // Per-level scaling: each level past 1 makes the brute 20% faster
+            // and 20% more damaging (rounded). Level 1 is unchanged.
+            int level = GameState.MazeLevel;
+            if (level > 1)
+            {
+                float scale = 1f + 0.2f * (level - 1);
+                _chaseSpeed *= scale;
+                _damagePerSecond = Mathf.RoundToInt(_damagePerSecond * scale);
+                _projectileDamage = Mathf.RoundToInt(_projectileDamage * scale);
+            }
         }
 
         private void Start()

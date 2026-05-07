@@ -40,5 +40,8 @@ namespace Maze.World
         // Expose a way for slice 11 to re-arm the lock after a loss/draw so the
         // player can try again by re-entering.
         public void ResetTrigger() => _triggered = false;
+
+        /// <summary>Set the difficulty tier programmatically (used by per-level scaling).</summary>
+        public void SetDifficulty(LockDifficultyTier tier) => _difficulty = tier;
     }
 }

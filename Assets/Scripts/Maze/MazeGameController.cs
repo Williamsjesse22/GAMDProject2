@@ -62,6 +62,19 @@ namespace Maze
             _escapeFanfare = SoundSynth.Arp("maze_escape", new[] { 523f, 659f, 784f, 1047f }, 0.7f, 0.55f);
         }
 
+        private void Start()
+        {
+            // Per-level lock difficulty: lvl 1 = Easy, lvl 2 = Medium, lvl 3+ = Hard.
+            if (_exitLock != null)
+            {
+                int level = GameState.MazeLevel;
+                LockDifficultyTier tier = level <= 1 ? LockDifficultyTier.Easy
+                                       : level == 2 ? LockDifficultyTier.Medium
+                                       : LockDifficultyTier.Hard;
+                _exitLock.SetDifficulty(tier);
+            }
+        }
+
         private void OnEnable()
         {
             SceneManager.sceneUnloaded += HandleSceneUnloaded;
@@ -101,14 +114,25 @@ namespace Maze
         public void HandlePortalEntered()
         {
             if (IsWon) return;
+
+            // Mid-run: bump the level counter and reload the scene. Agents +
+            // ExitLock + everything else re-initialize on Awake using the new
+            // GameState.MazeLevel value, so the next maze is harder.
+            if (GameState.MazeLevel < GameState.MaxMazeLevels)
+            {
+                GameState.MazeLevel++;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                return;
+            }
+
+            // Final level cleared — true escape.
             IsWon = true;
-            _bannerMessage = "YOU ESCAPED";
-            // Stop the player and free the cursor so the prompt is interactable.
+            _bannerMessage = $"YOU ESCAPED ALL {GameState.MaxMazeLevels} LEVELS";
             if (_player != null) _player.enabled = false;
-            // Disable agents so they can't keep damaging on the win screen.
             if (_fsmAgent != null) _fsmAgent.enabled = false;
             if (_btAgent != null) _btAgent.enabled = false;
-            // Hush the portal hum and play the win fanfare in its place.
             if (_portal != null) _portal.Deactivate();
             if (_audio != null && _escapeFanfare != null) _audio.PlayOneShot(_escapeFanfare);
             Cursor.lockState = CursorLockMode.None;

@@ -28,12 +28,20 @@ namespace Shared
         /// <summary>Result of the most recent lock attempt. Null until TTT writes it.</summary>
         public static LockOutcome? LastLockOutcome { get; set; }
 
-        /// <summary>Reset all fields — useful when leaving the maze entirely.</summary>
+        /// <summary>Current maze level the player is on (1-based). Persists across scene reloads.</summary>
+        public static int MazeLevel { get; set; } = 1;
+
+        /// <summary>How many levels the player has to clear before the run is won.</summary>
+        public static int MaxMazeLevels { get; set; } = 3;
+
+        /// <summary>Reset all fields — useful when leaving the maze entirely or finishing a run.</summary>
         public static void Reset()
         {
             IsLockMode = false;
             LockDifficulty = LockDifficultyTier.Medium;
             LastLockOutcome = null;
+            MazeLevel = 1;
+            MaxMazeLevels = 3;
         }
     }
 }

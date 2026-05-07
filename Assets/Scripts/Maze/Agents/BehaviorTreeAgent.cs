@@ -54,6 +54,16 @@ namespace Maze.Agents
             base.Awake();
             _patrolTarget = transform.position;
             BuildTree();
+
+            // Per-level scaling: cautious agent scales speed + DPS modestly per
+            // level, same factor as the FSM brute so they advance together.
+            int level = Shared.GameState.MazeLevel;
+            if (level > 1)
+            {
+                float scale = 1f + 0.2f * (level - 1);
+                _engageSpeed *= scale;
+                _damagePerSecond = Mathf.RoundToInt(_damagePerSecond * scale);
+            }
         }
 
         private void Start()
