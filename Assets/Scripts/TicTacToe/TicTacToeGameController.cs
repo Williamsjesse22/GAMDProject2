@@ -1,5 +1,6 @@
 using System.Collections;
 using Minimax;
+using Shared;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -28,14 +29,16 @@ namespace TicTacToe
         [Range(0f, 1f)]
         [SerializeField] private float _audioVolume = 0.7f;
 
-        private enum GameState { Menu, Playing, Over }
+        // Local PlayState enum (named distinctly to avoid colliding with
+        // Shared.GameState which we reference for lock-mode interop).
+        private enum PlayState { Menu, Playing, Over }
 
         private Board3D _board;
         private MinimaxAI _ai;
         private Player _aiPlayer;
         private Player _currentPlayer;
         private DifficultyLevel _difficulty = DifficultyLevel.Medium;
-        private GameState _state = GameState.Menu;
+        private PlayState _state = PlayState.Menu;
         private bool _aiThinking;
 
         private string _statusMessage = string.Empty;
@@ -98,13 +101,28 @@ namespace TicTacToe
         private void Start()
         {
             _visualizer.Build();
-            _statusMessage = "Press 1-5 to choose difficulty (or click)";
+
+            if (GameState.IsLockMode)
+            {
+                // Embedded as a maze lock minigame: skip the menu, start
+                // immediately at the depth the lock asked for.
+                DifficultyLevel level = DifficultyLevelExtensions.FromLockTier(GameState.LockDifficulty);
+                StartGame(level);
+            }
+            else
+            {
+                _statusMessage = "Press 1-5 to choose difficulty (or click)";
+            }
         }
 
         private void Update()
         {
-            // Global: R returns to the difficulty menu from any state.
-            if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
+            // Global: R returns to the difficulty menu — only in standalone
+            // mode. In lock mode, R would unhelpfully reset back to a menu
+            // that we deliberately skipped.
+            if (!GameState.IsLockMode
+                && Keyboard.current != null
+                && Keyboard.current.rKey.wasPressedThisFrame)
             {
                 BackToMenu();
                 return;
@@ -112,12 +130,12 @@ namespace TicTacToe
 
             switch (_state)
             {
-                case GameState.Menu:
+                case PlayState.Menu:
                     HandleMenuKeyboard();
                     return;
-                case GameState.Over:
+                case PlayState.Over:
                     return;
-                case GameState.Playing:
+                case PlayState.Playing:
                     if (_aiThinking) return;
                     if (_currentPlayer != _humanPlayer) return;
                     HandleHumanClick();
@@ -150,7 +168,7 @@ namespace TicTacToe
             if (interactor == null) return;
 
             if (TryPlay(interactor.X, interactor.Y, interactor.Z)
-                && _state == GameState.Playing
+                && _state == PlayState.Playing
                 && _currentPlayer == _aiPlayer)
             {
                 StartCoroutine(AiTurnCoroutine());
@@ -195,13 +213,14 @@ namespace TicTacToe
                 EndGame(humanWon ? "You win!"
                        : winner == _aiPlayer ? "AI wins."
                        : $"{winner} wins!",
-                       humanWon ? _winClip : _loseClip);
+                       humanWon ? _winClip : _loseClip,
+                       humanWon ? LockOutcome.Win : LockOutcome.Loss);
                 return true;
             }
 
             if (_board.IsFull)
             {
-                EndGame("Draw.", _drawClip);
+                EndGame("Draw.", _drawClip, LockOutcome.Draw);
                 return true;
             }
 
@@ -210,13 +229,31 @@ namespace TicTacToe
             return true;
         }
 
-        private void EndGame(string banner, AudioClip endCue)
+        private void EndGame(string banner, AudioClip endCue, LockOutcome outcome)
         {
-            _state = GameState.Over;
+            _state = PlayState.Over;
             _aiThinking = false;
             _resultBanner = banner;
-            _statusMessage = $"{banner}    Press R for menu.";
             PlayCue(endCue);
+
+            if (Shared.GameState.IsLockMode)
+            {
+                // Hand the result back to the maze and unload ourselves after a
+                // short delay so the player can see the result banner first.
+                Shared.GameState.LastLockOutcome = outcome;
+                _statusMessage = banner;
+                StartCoroutine(UnloadAfterDelay(1.5f));
+            }
+            else
+            {
+                _statusMessage = $"{banner}    Press R for menu.";
+            }
+        }
+
+        private IEnumerator UnloadAfterDelay(float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            SceneLoader.UnloadTicTacToe();
         }
 
         private void UpdatePlayingStatus()
@@ -235,7 +272,7 @@ namespace TicTacToe
             _visualizer.ClearPieces();
             _aiPlayer = _humanPlayer.Opponent();
             _currentPlayer = Player.X;
-            _state = GameState.Playing;
+            _state = PlayState.Playing;
             _aiThinking = false;
             _resultBanner = null;
             UpdatePlayingStatus();
@@ -252,7 +289,7 @@ namespace TicTacToe
             StopAllCoroutines();
             _board.Reset();
             _visualizer.ClearPieces();
-            _state = GameState.Menu;
+            _state = PlayState.Menu;
             _aiThinking = false;
             _resultBanner = null;
             _statusMessage = "Press 1-5 to choose difficulty (or click)";
@@ -279,8 +316,8 @@ namespace TicTacToe
         {
             EnsureStyles();
             DrawStatusText();
-            if (_state == GameState.Menu) DrawDifficultyMenu();
-            if (_state == GameState.Over && !string.IsNullOrEmpty(_resultBanner))
+            if (_state == PlayState.Menu) DrawDifficultyMenu();
+            if (_state == PlayState.Over && !string.IsNullOrEmpty(_resultBanner))
                 DrawResultBanner();
         }
 

@@ -1,10 +1,8 @@
 {
-    "name": "TicTacToe",
-    "rootNamespace": "TicTacToe",
+    "name": "Shared",
+    "rootNamespace": "Shared",
     "references": [
-        "Minimax",
-        "Unity.InputSystem",
-        "Shared"
+        "Minimax"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

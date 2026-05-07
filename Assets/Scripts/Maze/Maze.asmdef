@@ -3,7 +3,9 @@
     "rootNamespace": "Maze",
     "references": [
         "Unity.InputSystem",
-        "Unity.AI.Navigation"
+        "Unity.AI.Navigation",
+        "Minimax",
+        "Shared"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
