@@ -35,7 +35,9 @@ namespace Maze
         public static MazeGameController Instance { get; private set; }
 
         private string _bannerMessage;
+        private string _subtitleMessage;
         private GUIStyle _bannerStyle;
+        private GUIStyle _subtitleStyle;
         private GUIStyle _hintStyle;
         private Texture2D _whitePixel;
 
@@ -129,7 +131,10 @@ namespace Maze
 
             // Final level cleared — true escape.
             IsWon = true;
-            _bannerMessage = $"YOU ESCAPED ALL {GameState.MaxMazeLevels} LEVELS";
+            _bannerMessage = "YOU ESCAPED";
+            _subtitleMessage = GameState.MaxMazeLevels > 1
+                ? $"All {GameState.MaxMazeLevels} levels cleared!"
+                : null;
             if (_player != null) _player.enabled = false;
             if (_fsmAgent != null) _fsmAgent.enabled = false;
             if (_btAgent != null) _btAgent.enabled = false;
@@ -197,8 +202,13 @@ namespace Maze
             GUI.DrawTexture(new Rect(0, 0, w, h), _whitePixel);
             GUI.color = prev;
 
-            GUI.Label(new Rect(0, h * 0.35f, w, 90f), _bannerMessage, _bannerStyle);
-            GUI.Label(new Rect(0, h * 0.5f, w, 40f), "Press R to restart", _hintStyle);
+            // Layout: banner near 35% screen height, subtitle just below it,
+            // restart hint near 60%. Generous rect heights so wrapping (if any)
+            // doesn't get clipped at narrow aspect ratios.
+            GUI.Label(new Rect(0, h * 0.30f, w, 110f), _bannerMessage, _bannerStyle);
+            if (!string.IsNullOrEmpty(_subtitleMessage))
+                GUI.Label(new Rect(0, h * 0.46f, w, 60f), _subtitleMessage, _subtitleStyle);
+            GUI.Label(new Rect(0, h * 0.60f, w, 40f), "Press R to restart", _hintStyle);
         }
 
         private void EnsureStyles()
@@ -214,6 +224,12 @@ namespace Maze
                     fontSize = 64, fontStyle = FontStyle.Bold,
                     alignment = TextAnchor.MiddleCenter,
                     normal = { textColor = new Color(0.4f, 1f, 0.85f) }
+                };
+            if (_subtitleStyle == null)
+                _subtitleStyle = new GUIStyle(GUI.skin.label) {
+                    fontSize = 28, fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal = { textColor = new Color(0.85f, 1f, 0.95f) }
                 };
             if (_hintStyle == null)
                 _hintStyle = new GUIStyle(GUI.skin.label) {
