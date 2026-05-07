@@ -1,3 +1,4 @@
+using Maze.World;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -30,6 +31,17 @@ namespace Maze.Agents
         [SerializeField] private float _patrolSpeed = 2.5f;
         [SerializeField] private float _chaseSpeed = 4.5f;
 
+        [Header("Ranged attack (bonus)")]
+        [Tooltip("Disable to fall back to aura-only behavior.")]
+        [SerializeField] private bool _enableRangedAttack = true;
+        [Tooltip("Minimum chase-distance at which the agent will start firing.")]
+        [SerializeField] private float _shootMinRange = 4f;
+        [Tooltip("Maximum chase-distance at which the agent will fire (capped by visionRange).")]
+        [SerializeField] private float _shootMaxRange = 11f;
+        [SerializeField] private float _shootCooldownSeconds = 1.4f;
+        [SerializeField] private float _projectileSpeed = 14f;
+        [SerializeField] private int _projectileDamage = 12;
+
         public FsmState CurrentState => _state;
 
         private FsmState _state = FsmState.Patrol;
@@ -39,6 +51,7 @@ namespace Maze.Agents
         private float _damageAccumulator;
         private Vector3 _lastKnownPlayerPos;
         private bool _hasObservedPlayer;
+        private float _nextShotTime;
 
         protected override void Awake()
         {
@@ -86,10 +99,23 @@ namespace Maze.Agents
             {
                 _lastKnownPlayerPos = _player.position;
                 _agent.SetDestination(_lastKnownPlayerPos);
-                if (DistanceToPlayer() <= _auraRange)
+
+                float dist = DistanceToPlayer();
+                if (dist <= _auraRange)
                 {
                     TransitionTo(FsmState.AttackAura);
                     return;
+                }
+
+                // Ranged attack: fire while chasing if within shoot range and
+                // cooldown elapsed. Aura still kicks in on close approach.
+                if (_enableRangedAttack
+                    && dist >= _shootMinRange
+                    && dist <= _shootMaxRange
+                    && Time.time >= _nextShotTime)
+                {
+                    FireProjectile();
+                    _nextShotTime = Time.time + _shootCooldownSeconds;
                 }
             }
             else
@@ -98,6 +124,40 @@ namespace Maze.Agents
                 _agent.SetDestination(_lastKnownPlayerPos);
                 TransitionTo(FsmState.LostSight);
             }
+        }
+
+        private void FireProjectile()
+        {
+            if (_player == null) return;
+
+            // Spawn outside the agent's own collider, lead a tiny bit by aiming
+            // at the player's eye line.
+            Vector3 origin = transform.position + Vector3.up * _eyeHeight + transform.forward * 0.7f;
+            Vector3 target = _player.position + Vector3.up * _eyeHeight;
+            Vector3 dir = (target - origin).normalized;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = "FsmProjectile";
+            go.transform.position = origin;
+            go.transform.localScale = Vector3.one * 0.28f;
+
+            // Tracer color so it reads visually as "shot fired".
+            var renderer = go.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                var mat = new Material(renderer.sharedMaterial);
+                mat.color = new Color(1f, 0.6f, 0.2f);
+                renderer.sharedMaterial = mat;
+            }
+
+            // Rigidbody so the Projectile can drive it through OnCollisionEnter.
+            var rb = go.AddComponent<Rigidbody>();
+            rb.useGravity = false;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+            var proj = go.AddComponent<Projectile>();
+            proj.Initialize(dir * _projectileSpeed, gameObject, _projectileDamage);
         }
 
         private void TickAttackAura(bool seen)
