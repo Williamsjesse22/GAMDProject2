@@ -74,14 +74,21 @@ namespace Maze.Agents
             float angle = Vector3.Angle(transform.forward, flatDir);
             if (angle > _visionAngleDegrees * 0.5f) return false;
 
-            // Line-of-sight raycast to the player. If the first hit isn't on the
-            // player hierarchy, sight is blocked by geometry.
+            // Line-of-sight raycast to the player. We use RaycastAll + filter so
+            // we can skip self-collisions: when agent and player overlap (an
+            // edge that does happen — initial chase spike, kiting interactions),
+            // the agent's own capsule would otherwise be the first hit and we'd
+            // wrongly report sight as blocked. Sight is clear iff no collider
+            // OTHER than the agent itself or the player is along the ray.
             Vector3 dir = toPlayer / distance;
-            if (Physics.Raycast(eye, dir, out RaycastHit hit, distance + 0.1f,
-                                _occluders, QueryTriggerInteraction.Ignore))
+            RaycastHit[] hits = Physics.RaycastAll(eye, dir, distance + 0.1f,
+                                                   _occluders, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hits.Length; i++)
             {
-                if (hit.transform != _player && !hit.transform.IsChildOf(_player))
-                    return false;
+                Transform t = hits[i].transform;
+                if (t == transform || t.IsChildOf(transform)) continue;
+                if (t == _player || t.IsChildOf(_player)) continue;
+                return false;
             }
             return true;
         }
