@@ -1,3 +1,4 @@
+using System.Collections;
 using Minimax;
 using UnityEngine;
 
@@ -108,7 +109,10 @@ namespace TicTacToe
             _lastMoveIdx = -1;
         }
 
-        /// <summary>Recolor the four pieces along a winning line so the win is visible.</summary>
+        /// <summary>
+        /// Recolor the four pieces along a winning line gold, then run a brief
+        /// pulse-and-bob animation so the win is unmistakable.
+        /// </summary>
         public void HighlightLine(int[] line)
         {
             if (line == null) return;
@@ -116,6 +120,44 @@ namespace TicTacToe
             {
                 GameObject piece = _pieces[line[i]];
                 if (piece != null) ApplyColor(piece, _winningHighlightColor);
+            }
+            StartCoroutine(WinAnimationCoroutine(line));
+        }
+
+        private IEnumerator WinAnimationCoroutine(int[] line)
+        {
+            const float duration = 1.4f;
+            float t = 0f;
+            while (t < duration)
+            {
+                t += Time.deltaTime;
+                for (int i = 0; i < line.Length; i++)
+                {
+                    GameObject piece = _pieces[line[i]];
+                    if (piece == null) continue;
+
+                    // Fast pulse on scale for a "buzzing with energy" feel.
+                    float pulse = 1f + 0.35f * Mathf.Sin(t * 14f);
+                    piece.transform.localScale = Vector3.one * _pieceScale * pulse;
+
+                    // Staggered bob so the line ripples from one end to the other.
+                    var (x, y, z) = Board3D.Coords(line[i]);
+                    Vector3 basePos = LocalCellPos(x, y, z);
+                    float bobPhase = t * 6f - i * 1.0f;
+                    float bob = 0.22f * Mathf.Max(0f, Mathf.Sin(bobPhase));
+                    piece.transform.localPosition = basePos + new Vector3(0f, bob, 0f);
+                }
+                yield return null;
+            }
+
+            // Settle back to original positions + scale (color stays gold).
+            for (int i = 0; i < line.Length; i++)
+            {
+                GameObject piece = _pieces[line[i]];
+                if (piece == null) continue;
+                var (x, y, z) = Board3D.Coords(line[i]);
+                piece.transform.localPosition = LocalCellPos(x, y, z);
+                piece.transform.localScale = Vector3.one * _pieceScale;
             }
         }
 
