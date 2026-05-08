@@ -199,6 +199,8 @@ namespace TicTacToe
         {
             Mouse mouse = Mouse.current;
             if (mouse == null || _camera == null) { _visualizer.HideGhost(); return; }
+            // Hide ghost while orbiting so it doesn't trail the cursor through dead air.
+            if (IsAltHeld()) { _visualizer.HideGhost(); return; }
 
             Vector2 screenPos = mouse.position.ReadValue();
             Ray ray = _camera.ScreenPointToRay(screenPos);
@@ -216,6 +218,12 @@ namespace TicTacToe
             }
 
             _visualizer.SetGhostMove(interactor.X, interactor.Y, interactor.Z, _humanPlayer);
+        }
+
+        private static bool IsAltHeld()
+        {
+            Keyboard kb = Keyboard.current;
+            return kb != null && (kb.leftAltKey.isPressed || kb.rightAltKey.isPressed);
         }
 
         private void UndoLastMovePair()
@@ -260,6 +268,8 @@ namespace TicTacToe
             Mouse mouse = Mouse.current;
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
             if (_camera == null) return;
+            // Don't place a piece while the user is orbiting the camera.
+            if (IsAltHeld()) return;
 
             Vector2 screenPos = mouse.position.ReadValue();
             Ray ray = _camera.ScreenPointToRay(screenPos);
