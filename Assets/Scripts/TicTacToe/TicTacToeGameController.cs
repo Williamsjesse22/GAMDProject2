@@ -288,7 +288,7 @@ namespace TicTacToe
         private IEnumerator AiTurnCoroutine()
         {
             _aiThinking = true;
-            _statusMessage = $"AI thinking…    [{_difficulty}, depth {_difficulty.ToDepth()}]";
+            _statusMessage = $"AI thinking…    [{_difficulty}, depth {_difficulty.ToDepth()}]{ControlsSuffix}";
             // Yield once so the "thinking" message paints before we block.
             yield return null;
             if (_aiThinkPauseSeconds > 0f) yield return new WaitForSeconds(_aiThinkPauseSeconds);
@@ -370,18 +370,19 @@ namespace TicTacToe
             SceneLoader.UnloadTicTacToe();
         }
 
+        // Suffix shown on the in-game status line. Lock mode skips the rules
+        // panel, so this is the first-time player's only hint about Alt+drag.
+        // R/U are suppressed in lock mode so they're omitted from that variant.
+        private static string ControlsSuffix => GameState.IsLockMode
+            ? "    Alt+drag = orbit"
+            : "    Alt+drag = orbit  ·  R = menu  ·  U = undo";
+
         private void UpdatePlayingStatus()
         {
             string who = _currentPlayer == _humanPlayer
                 ? $"Your move ({_humanPlayer})"
                 : "AI's move";
-            // Camera controls always visible — the lock mode skips the rules panel,
-            // so this status line is the only place a first-time player sees them.
-            // R/U are suppressed in lock mode so they don't appear in that hint.
-            string controls = GameState.IsLockMode
-                ? "    Alt+drag = orbit  ·  Scroll = zoom"
-                : "    Alt+drag = orbit  ·  Scroll = zoom  ·  R = menu  ·  U = undo";
-            _statusMessage = $"{who}    [{_difficulty}, depth {_difficulty.ToDepth()}]{controls}";
+            _statusMessage = $"{who}    [{_difficulty}, depth {_difficulty.ToDepth()}]{ControlsSuffix}";
         }
 
         private void StartGame(DifficultyLevel difficulty)
@@ -490,7 +491,6 @@ namespace TicTacToe
             GUILayout.Label("CONTROLS", _rulesSectionStyle);
             GUILayout.Label("●  Click an empty cell to place your piece", _rulesBodyStyle);
             GUILayout.Label("●  Hold  ALT  (Option on Mac)  + drag mouse to orbit the camera", _rulesBodyStyle);
-            GUILayout.Label("●  Scroll wheel to zoom in / out", _rulesBodyStyle);
             GUILayout.Label("●  R = back to menu   ·   U = undo your last move", _rulesBodyStyle);
             GUILayout.Space(10);
 
