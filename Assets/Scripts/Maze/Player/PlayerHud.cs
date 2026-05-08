@@ -83,9 +83,21 @@ namespace Maze.Player
                 Keyboard kb = Keyboard.current;
                 if (kb != null && kb.rKey.wasPressedThisFrame)
                 {
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                    // Hand control to MazeGameController if it exists in the
+                    // scene — that path regenerates the maze around the player
+                    // instead of doing a heavyweight scene reload. Standalone
+                    // standalone scenes without the controller still get the
+                    // legacy reload behavior.
+                    if (MazeGameController.Instance != null)
+                    {
+                        MazeGameController.Instance.HandlePlayerDied();
+                    }
+                    else
+                    {
+                        Cursor.lockState = CursorLockMode.None;
+                        Cursor.visible = true;
+                        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                    }
                 }
             }
         }

@@ -67,10 +67,14 @@ namespace Maze.World
         private void ClearWalls()
         {
             if (_wallParent == null) return;
+            // Use DestroyImmediate even in play mode — Destroy is end-of-frame
+            // async, but we need the old walls gone *before* SpawnWalls + the
+            // NavMesh rebake see them as obstacles. Plain wall primitives have
+            // no destruction-time logic so this is safe.
             for (int i = _wallParent.childCount - 1; i >= 0; i--)
             {
                 GameObject child = _wallParent.GetChild(i).gameObject;
-                if (Application.isPlaying) Destroy(child); else DestroyImmediate(child);
+                DestroyImmediate(child);
             }
         }
 

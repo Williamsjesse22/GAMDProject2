@@ -124,6 +124,53 @@ namespace Maze
             SceneLoader.LoadTicTacToeAdditive(tier);
         }
 
+        /// <summary>
+        /// Called by <see cref="PlayerHud"/> when the player presses R after dying.
+        /// Instead of reloading the scene, regenerate the maze around the player's
+        /// current position: their corpse cell becomes the new start, the lock
+        /// teleports to a new far cell, and the player is fully healed and
+        /// re-enabled. The maze layout itself rerolls so the path is different.
+        /// </summary>
+        public void HandlePlayerDied()
+        {
+            if (IsWon) return;
+            if (_mazeBuilder == null) return;
+            if (_player == null) return;
+
+            // Find the cell the player is currently standing in.
+            Vector2Int playerCell = _mazeBuilder.CellAtWorld(_player.transform.position);
+
+            // Pick a new lock cell that's far from the player (Chebyshev distance
+            // >= half the grid). Random pick from those candidates.
+            int gs = _mazeBuilder.GridSize;
+            int minSep = Mathf.Max(2, gs / 2);
+            var candidates = new System.Collections.Generic.List<Vector2Int>();
+            for (int x = 0; x < gs; x++)
+                for (int y = 0; y < gs; y++)
+                {
+                    int dx = Mathf.Abs(x - playerCell.x);
+                    int dy = Mathf.Abs(y - playerCell.y);
+                    if (Mathf.Max(dx, dy) >= minSep) candidates.Add(new Vector2Int(x, y));
+                }
+            Vector2Int lockCell = candidates.Count > 0
+                ? candidates[Random.Range(0, candidates.Count)]
+                : new Vector2Int(gs - 1, gs - 1);
+
+            // Fresh seed so the maze rerolls.
+            int seed = unchecked(Random.Range(0, int.MaxValue) ^ (int)System.DateTime.UtcNow.Ticks);
+            _mazeBuilder.Build(seed, playerCell, lockCell);
+
+            // Heal + re-enable player; re-arm the lock + hide the portal.
+            HealthComponent hp = _player.GetComponent<HealthComponent>();
+            if (hp != null) hp.ResetToFull();
+            _player.enabled = true;
+            if (_playerCamera != null) _playerCamera.enabled = true;
+            if (_playerHud != null) _playerHud.enabled = true;
+            if (_exitLock != null) _exitLock.ResetTrigger();
+            if (_portal != null) _portal.Deactivate();
+            // Cursor: leave free so the player can click to re-lock as normal.
+        }
+
         public void HandlePortalEntered()
         {
             if (IsWon) return;
