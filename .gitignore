@@ -41,6 +41,9 @@
 /[Aa]ssets/[Ss]creenshots/
 /[Aa]ssets/[Ss]creenshots.meta
 
+# Local rubric/spec PDFs — reference material, not part of the codebase
+/projectSpec/
+
 # Visual Studio cache directory
 .vs/
 
