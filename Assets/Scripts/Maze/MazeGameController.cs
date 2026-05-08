@@ -27,6 +27,7 @@ namespace Maze
         [SerializeField] private BehaviorTreeAgent _btAgent;
         [SerializeField] private ExitLock _exitLock;
         [SerializeField] private Portal _portal;
+        [SerializeField] private MazeBuilder _mazeBuilder;
 
         public bool IsLockActive { get; private set; }
         public bool IsWon { get; private set; }
@@ -55,6 +56,16 @@ namespace Maze
             if (_btAgent == null) _btAgent = FindAnyObjectByType<BehaviorTreeAgent>();
             if (_exitLock == null) _exitLock = FindAnyObjectByType<ExitLock>();
             if (_portal == null) _portal = FindAnyObjectByType<Portal>();
+            if (_mazeBuilder == null) _mazeBuilder = FindAnyObjectByType<MazeBuilder>();
+
+            // Build the procedural maze BEFORE other components depend on the
+            // final layout. Seed off the level + a random component so each
+            // level has a fresh maze.
+            if (_mazeBuilder != null)
+            {
+                int seed = GameState.MazeLevel * 100003 + Random.Range(0, 1_000_000);
+                _mazeBuilder.Build(seed);
+            }
 
             _audio = GetComponent<AudioSource>();
             if (_audio == null) _audio = gameObject.AddComponent<AudioSource>();
