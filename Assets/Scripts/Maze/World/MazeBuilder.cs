@@ -17,10 +17,10 @@ namespace Maze.World
     public sealed class MazeBuilder : MonoBehaviour
     {
         [Header("Grid")]
-        [Tooltip("Number of cells along each axis (square grid).")]
-        [SerializeField] private int _gridSize = 7;
-        [Tooltip("World-space size of one cell.")]
-        [SerializeField] private float _cellSize = 4f;
+        [Tooltip("Number of cells along each axis (square grid). Higher = more cells = longer dead-end branches.")]
+        [SerializeField] private int _gridSize = 11;
+        [Tooltip("World-space size of one cell. Floor should be at least gridSize × cellSize.")]
+        [SerializeField] private float _cellSize = 2.6f;
 
         [Header("Walls")]
         [SerializeField] private float _wallHeight = 3f;
