@@ -4,6 +4,7 @@ using Minimax;
 using Shared;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace TicTacToe
 {
@@ -33,10 +34,6 @@ namespace TicTacToe
         // Local PlayState enum (named distinctly to avoid colliding with
         // Shared.GameState which we reference for lock-mode interop).
         private enum PlayState { Rules, Menu, Playing, Over }
-
-        // Static so the rules screen is shown once per editor session in
-        // standalone mode and skipped on subsequent plays.
-        private static bool s_rulesShown;
 
         private Board3D _board;
         private MinimaxAI _ai;
@@ -115,6 +112,15 @@ namespace TicTacToe
         {
             _visualizer.Build();
 
+            // Self-heal: GameState.IsLockMode is a static that survives Play-mode
+            // exits. If the player quit mid-lock previously, it can leak true into
+            // a standalone TTT run and silently suppress the rules panel + R/U keys.
+            // Detect "no Maze scene loaded with us" → standalone → clear the flag.
+            if (!SceneManager.GetSceneByName(SceneLoader.MazeSceneName).isLoaded)
+            {
+                GameState.IsLockMode = false;
+            }
+
             if (GameState.IsLockMode)
             {
                 // Embedded as a maze lock minigame: skip the menu, start
@@ -122,17 +128,11 @@ namespace TicTacToe
                 DifficultyLevel level = DifficultyLevelExtensions.FromLockTier(GameState.LockDifficulty);
                 StartGame(level);
             }
-            else if (!s_rulesShown)
-            {
-                // Standalone first launch: explain the 4-in-a-row rules
-                // before showing the difficulty menu.
-                _state = PlayState.Rules;
-                _statusMessage = string.Empty;
-            }
             else
             {
-                _state = PlayState.Menu;
-                _statusMessage = "Press 1-5 to choose difficulty (or click)";
+                // Standalone always opens with the rules/controls/difficulty panel.
+                _state = PlayState.Rules;
+                _statusMessage = string.Empty;
             }
         }
 
@@ -189,7 +189,6 @@ namespace TicTacToe
             if (kb == null) return;
             if (kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)
             {
-                s_rulesShown = true;
                 _state = PlayState.Menu;
                 _statusMessage = "Press 1-5 to choose difficulty (or click)";
             }
@@ -376,9 +375,12 @@ namespace TicTacToe
             string who = _currentPlayer == _humanPlayer
                 ? $"Your move ({_humanPlayer})"
                 : "AI's move";
+            // Camera controls always visible — the lock mode skips the rules panel,
+            // so this status line is the only place a first-time player sees them.
+            // R/U are suppressed in lock mode so they don't appear in that hint.
             string controls = GameState.IsLockMode
-                ? string.Empty
-                : "    R = menu    U = undo";
+                ? "    Alt+drag = orbit  ·  Scroll = zoom"
+                : "    Alt+drag = orbit  ·  Scroll = zoom  ·  R = menu  ·  U = undo";
             _statusMessage = $"{who}    [{_difficulty}, depth {_difficulty.ToDepth()}]{controls}";
         }
 
@@ -458,7 +460,7 @@ namespace TicTacToe
             GUI.color = prev;
 
             const float panelW = 620f;
-            const float panelH = 540f;
+            const float panelH = 700f;
             var panelRect = new Rect((w - panelW) * 0.5f, (h - panelH) * 0.5f, panelW, panelH);
             GUI.Box(panelRect, GUIContent.none);
 
@@ -485,10 +487,21 @@ namespace TicTacToe
             GUILayout.Label("If a click does nothing, you hit an occupied cell or missed.", _rulesBodyStyle);
             GUILayout.Space(10);
 
+            GUILayout.Label("CONTROLS", _rulesSectionStyle);
+            GUILayout.Label("●  Click an empty cell to place your piece", _rulesBodyStyle);
+            GUILayout.Label("●  Hold  ALT  (Option on Mac)  + drag mouse to orbit the camera", _rulesBodyStyle);
+            GUILayout.Label("●  Scroll wheel to zoom in / out", _rulesBodyStyle);
+            GUILayout.Label("●  R = back to menu   ·   U = undo your last move", _rulesBodyStyle);
+            GUILayout.Space(10);
+
+            GUILayout.Label("DIFFICULTY", _rulesSectionStyle);
+            GUILayout.Label("How many moves ahead the AI plans (deeper = stronger, slower):", _rulesBodyStyle);
+            GUILayout.Label("●  1 Easy  ·  2 Easy-Med  ·  3 Medium  ·  4 Hard  ·  5 Expert", _rulesBodyStyle);
+            GUILayout.Space(10);
+
             GUILayout.Label("TIPS", _rulesSectionStyle);
             GUILayout.Label("●  The dim translucent piece is a hover preview, not a placement.", _rulesBodyStyle);
             GUILayout.Label("●  Winning lines highlight gold + animate when complete.", _rulesBodyStyle);
-            GUILayout.Label("●  R = back to menu   ·   U = undo your last move.", _rulesBodyStyle);
             GUILayout.FlexibleSpace();
             GUILayout.Label("Press  SPACE  or  ENTER  to continue", _rulesHintStyle);
             GUILayout.EndArea();
