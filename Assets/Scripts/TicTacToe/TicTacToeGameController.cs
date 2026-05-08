@@ -32,7 +32,11 @@ namespace TicTacToe
 
         // Local PlayState enum (named distinctly to avoid colliding with
         // Shared.GameState which we reference for lock-mode interop).
-        private enum PlayState { Menu, Playing, Over }
+        private enum PlayState { Rules, Menu, Playing, Over }
+
+        // Static so the rules screen is shown once per editor session in
+        // standalone mode and skipped on subsequent plays.
+        private static bool s_rulesShown;
 
         private Board3D _board;
         private MinimaxAI _ai;
@@ -51,6 +55,11 @@ namespace TicTacToe
         private GUIStyle _bannerStyle;
         private GUIStyle _menuTitleStyle;
         private GUIStyle _buttonStyle;
+        private GUIStyle _rulesTitleStyle;
+        private GUIStyle _rulesSectionStyle;
+        private GUIStyle _rulesBodyStyle;
+        private GUIStyle _rulesHintStyle;
+        private Texture2D _whitePixel;
 
         private AudioSource _audio;
         private AudioClip _humanPlaceClip;
@@ -113,8 +122,16 @@ namespace TicTacToe
                 DifficultyLevel level = DifficultyLevelExtensions.FromLockTier(GameState.LockDifficulty);
                 StartGame(level);
             }
+            else if (!s_rulesShown)
+            {
+                // Standalone first launch: explain the 4-in-a-row rules
+                // before showing the difficulty menu.
+                _state = PlayState.Rules;
+                _statusMessage = string.Empty;
+            }
             else
             {
+                _state = PlayState.Menu;
                 _statusMessage = "Press 1-5 to choose difficulty (or click)";
             }
         }
@@ -144,6 +161,9 @@ namespace TicTacToe
 
             switch (_state)
             {
+                case PlayState.Rules:
+                    HandleRulesDismiss();
+                    return;
                 case PlayState.Menu:
                     HandleMenuKeyboard();
                     return;
@@ -160,6 +180,18 @@ namespace TicTacToe
                     UpdateHoverPreview();
                     HandleHumanClick();
                     return;
+            }
+        }
+
+        private void HandleRulesDismiss()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb == null) return;
+            if (kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame)
+            {
+                s_rulesShown = true;
+                _state = PlayState.Menu;
+                _statusMessage = "Press 1-5 to choose difficulty (or click)";
             }
         }
 
@@ -393,10 +425,63 @@ namespace TicTacToe
         private void OnGUI()
         {
             EnsureStyles();
+            if (_state == PlayState.Rules)
+            {
+                DrawRulesPanel();
+                return;
+            }
             DrawStatusText();
             if (_state == PlayState.Menu) DrawDifficultyMenu();
             if (_state == PlayState.Over && !string.IsNullOrEmpty(_resultBanner))
                 DrawResultBanner();
+        }
+
+        private void DrawRulesPanel()
+        {
+            float w = Screen.width;
+            float h = Screen.height;
+
+            // Dim backdrop.
+            Color prev = GUI.color;
+            GUI.color = new Color(0f, 0.05f, 0.1f, 0.78f);
+            GUI.DrawTexture(new Rect(0, 0, w, h), _whitePixel);
+            GUI.color = prev;
+
+            const float panelW = 620f;
+            const float panelH = 540f;
+            var panelRect = new Rect((w - panelW) * 0.5f, (h - panelH) * 0.5f, panelW, panelH);
+            GUI.Box(panelRect, GUIContent.none);
+
+            GUILayout.BeginArea(new Rect(panelRect.x + 30, panelRect.y + 22,
+                                          panelRect.width - 60, panelRect.height - 44));
+            GUILayout.Label("3D TIC-TAC-TOE — RULES", _rulesTitleStyle);
+            GUILayout.Space(14);
+
+            GUILayout.Label("THE BOARD", _rulesSectionStyle);
+            GUILayout.Label("64 cells in a 4×4×4 cube — four 4×4 layers stacked vertically.", _rulesBodyStyle);
+            GUILayout.Space(10);
+
+            GUILayout.Label("HOW TO WIN", _rulesSectionStyle);
+            GUILayout.Label("Get FOUR of your pieces in a row — not three.", _rulesBodyStyle);
+            GUILayout.Label("A row can run in any of these 76 ways:", _rulesBodyStyle);
+            GUILayout.Label("●  Along an edge of the cube  (left-right, front-back, up-down)", _rulesBodyStyle);
+            GUILayout.Label("●  Diagonally across one layer  (e.g. top-left to bottom-right)", _rulesBodyStyle);
+            GUILayout.Label("●  Diagonally through all four layers  (3D space diagonals)", _rulesBodyStyle);
+            GUILayout.Space(10);
+
+            GUILayout.Label("TURNS", _rulesSectionStyle);
+            GUILayout.Label("You play X; the AI plays O.  X always moves first.", _rulesBodyStyle);
+            GUILayout.Label("After every click, the AI takes one turn — strict 1-for-1.", _rulesBodyStyle);
+            GUILayout.Label("If a click does nothing, you hit an occupied cell or missed.", _rulesBodyStyle);
+            GUILayout.Space(10);
+
+            GUILayout.Label("TIPS", _rulesSectionStyle);
+            GUILayout.Label("●  The dim translucent piece is a hover preview, not a placement.", _rulesBodyStyle);
+            GUILayout.Label("●  Winning lines highlight gold + animate when complete.", _rulesBodyStyle);
+            GUILayout.Label("●  R = back to menu   ·   U = undo your last move.", _rulesBodyStyle);
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("Press  SPACE  or  ENTER  to continue", _rulesHintStyle);
+            GUILayout.EndArea();
         }
 
         private void EnsureStyles()
@@ -439,6 +524,34 @@ namespace TicTacToe
                     fixedHeight = 42
                 };
             }
+            if (_whitePixel == null)
+            {
+                _whitePixel = new Texture2D(1, 1);
+                _whitePixel.SetPixel(0, 0, Color.white);
+                _whitePixel.Apply();
+            }
+            if (_rulesTitleStyle == null)
+                _rulesTitleStyle = new GUIStyle(GUI.skin.label) {
+                    fontSize = 28, fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal = { textColor = new Color(0.95f, 0.85f, 0.4f) }
+                };
+            if (_rulesSectionStyle == null)
+                _rulesSectionStyle = new GUIStyle(GUI.skin.label) {
+                    fontSize = 18, fontStyle = FontStyle.Bold,
+                    normal = { textColor = new Color(0.6f, 0.95f, 1f) }
+                };
+            if (_rulesBodyStyle == null)
+                _rulesBodyStyle = new GUIStyle(GUI.skin.label) {
+                    fontSize = 15,
+                    normal = { textColor = new Color(0.92f, 0.92f, 0.92f) }
+                };
+            if (_rulesHintStyle == null)
+                _rulesHintStyle = new GUIStyle(GUI.skin.label) {
+                    fontSize = 18, fontStyle = FontStyle.Bold,
+                    alignment = TextAnchor.MiddleCenter,
+                    normal = { textColor = new Color(1f, 1f, 1f, 0.9f) }
+                };
         }
 
         private void DrawStatusText()
