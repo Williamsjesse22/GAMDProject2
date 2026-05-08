@@ -370,7 +370,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: TicTacToe::TicTacToe.TicTacToeGameController
   _visualizer: {fileID: 600845488}
   _camera: {fileID: 381874244}
-  _startingPlayer: 1
+  _humanPlayer: 1
+  _aiThinkPauseSeconds: 0.35
+  _enableAudio: 1
+  _audioVolume: 0.7
 --- !u!114 &600845488
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -384,13 +387,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: TicTacToe::TicTacToe.BoardVisualizer
   _cellSpacing: 1.5
-  _layerSpacing: 1.8
-  _cellScale: 0.18
+  _layerSpacing: 2.4
+  _cellScale: 0.22
   _pieceScale: 0.55
-  _cellColor: {r: 0.55, g: 0.55, b: 0.6, a: 1}
+  _layerColors:
+  - {r: 0.4, g: 0.55, b: 0.75, a: 1}
+  - {r: 0.4, g: 0.75, b: 0.65, a: 1}
+  - {r: 0.8, g: 0.7, b: 0.4, a: 1}
+  - {r: 0.8, g: 0.45, b: 0.45, a: 1}
   _xColor: {r: 0.85, g: 0.25, b: 0.25, a: 1}
   _oColor: {r: 0.25, g: 0.45, b: 0.85, a: 1}
   _winningHighlightColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  _lastMoveScaleMultiplier: 1.25
+  _lastMoveTintAmount: 0.4
 --- !u!4 &600845489
 Transform:
   m_ObjectHideFlags: 0

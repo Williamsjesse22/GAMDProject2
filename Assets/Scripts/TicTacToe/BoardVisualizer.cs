@@ -13,15 +13,23 @@ namespace TicTacToe
     {
         [Header("Layout")]
         [SerializeField] private float _cellSpacing = 1.5f;
-        [SerializeField] private float _layerSpacing = 1.8f;
+        [Tooltip("Vertical gap between layers — larger values make the four 4×4 layers visually more distinct.")]
+        [SerializeField] private float _layerSpacing = 2.4f;
         // Cells render as small marker dots so pieces (rendered larger) sit visibly
         // around them. The collider is grown back up to ~unit world-space below so
         // the click target still covers the full cell volume.
-        [SerializeField] private float _cellScale = 0.18f;
+        [SerializeField] private float _cellScale = 0.22f;
         [SerializeField] private float _pieceScale = 0.55f;
 
         [Header("Colors")]
-        [SerializeField] private Color _cellColor = new Color(0.55f, 0.55f, 0.6f);
+        [Tooltip("Cell tint per layer (z=0 to z=3). Cool→warm gradient so layers are easy to tell apart.")]
+        [SerializeField] private Color[] _layerColors = new Color[]
+        {
+            new Color(0.40f, 0.55f, 0.75f), // layer 0 (bottom) — blue
+            new Color(0.40f, 0.75f, 0.65f), // layer 1 — teal
+            new Color(0.80f, 0.70f, 0.40f), // layer 2 — yellow
+            new Color(0.80f, 0.45f, 0.45f), // layer 3 (top) — red
+        };
         [SerializeField] private Color _xColor = new Color(0.85f, 0.25f, 0.25f);
         [SerializeField] private Color _oColor = new Color(0.25f, 0.45f, 0.85f);
         [SerializeField] private Color _winningHighlightColor = new Color(1f, 0.85f, 0.2f);
@@ -235,7 +243,7 @@ namespace TicTacToe
             cell.transform.localPosition = LocalCellPos(x, y, z);
             cell.transform.localScale = Vector3.one * _cellScale;
             cell.name = $"Cell_{x}_{y}_{z}";
-            ApplyColor(cell, _cellColor);
+            ApplyColor(cell, GetLayerColor(z));
 
             // Cube primitive already has BoxCollider; expand it slightly so clicks
             // anywhere in the visual cell volume register, not just the small core.
@@ -246,6 +254,14 @@ namespace TicTacToe
             interactor.Init(x, y, z);
 
             _cells[Board3D.Index(x, y, z)] = cell;
+        }
+
+        private Color GetLayerColor(int z)
+        {
+            if (_layerColors == null || _layerColors.Length == 0)
+                return new Color(0.55f, 0.55f, 0.6f);
+            int idx = Mathf.Clamp(z, 0, _layerColors.Length - 1);
+            return _layerColors[idx];
         }
 
         private Vector3 LocalCellPos(int x, int y, int z)
